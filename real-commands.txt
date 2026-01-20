@@ -1,0 +1,88 @@
+ubuntu@ip-172-31-41-206:~$ sudo apt update
+ubuntu@ip-172-31-41-206:~$ sudo apt install -y awscli jq postgresql-client
+ubuntu@ip-172-31-41-206:~$ aws configure set region ap-south-1
+ubuntu@ip-172-31-41-206:~$ SECRET=$(aws secretsmanager get-secret-value \
+  --secret-id rds\!db-14d99d97-2338-4cdf-ade0-a27f1df75390 \
+  --query SecretString \
+  --output text)
+ubuntu@ip-172-31-41-206:~$ DB_USER=$(echo "$SECRET" | jq -r .username)
+ubuntu@ip-172-31-41-206:~$ DB_PASS=$(echo "$SECRET" | jq -r .password)
+ubuntu@ip-172-31-41-206:~$ export DB_HOST="database-1.cjmguigyom7s.ap-south-1.rds.amazonaws.com"
+ubuntu@ip-172-31-41-206:~$ export DB_PORT=5432
+ubuntu@ip-172-31-41-206:~$ export DB_NAME=postgres
+ubuntu@ip-172-31-41-206:~$ PGPASSWORD="$DB_PASS" psql \
+  -h "$DB_HOST" \
+  -U "$DB_USER" \
+  -d "$DB_NAME" \
+  -p "$DB_PORT"
+psql (14.20 (Ubuntu 14.20-0ubuntu0.22.04.1), server 17.6)
+WARNING: psql major version 14, server major version 17.
+         Some psql features might not work.
+SSL connection (protocol: TLSv1.3, cipher: TLS_AES_256_GCM_SHA384, bits: 256, compression: off)
+Type "help" for help.
+
+postgres=> exit
+
+
+SECOND SENARIO
+
+ubuntu@ip-172-31-41-206:~$ PGPASSWORD="$DB_PASS" psql   -h "$DB_HOST"   -U "$DB_USER"   -d "$DB_NAME"   -p "$DB_PORT"
+psql (14.20 (Ubuntu 14.20-0ubuntu0.22.04.1), server 17.6)
+WARNING: psql major version 14, server major version 17.
+         Some psql features might not work.
+SSL connection (protocol: TLSv1.3, cipher: TLS_AES_256_GCM_SHA384, bits: 256, compression: off)
+Type "help" for help.
+
+postgres=> CREATE USER iam_user WITH LOGIN;
+CREATE ROLE
+postgres=> GRANT CONNECT ON DATABASE postgres TO iam_user;
+GRANT
+postgres=> GRANT USAGE ON SCHEMA public TO iam_user;
+GRANT
+postgres=> GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO iam_user;
+GRANT
+postgres=> GRANT rds_iam TO iam_user;
+GRANT ROLE
+postgres=> exit
+ubuntu@ip-172-31-41-206:~$ wget https://truststore.pki.rds.amazonaws.com/ap-south-1/ap-south-1-bundle.pem
+--2026-01-20 06:51:31--  https://truststore.pki.rds.amazonaws.com/ap-south-1/ap-south-1-bundle.pem
+Resolving truststore.pki.rds.amazonaws.com (truststore.pki.rds.amazonaws.com)... 13.226.2.99, 13.226.2.58, 13.226.2.67, ...
+Connecting to truststore.pki.rds.amazonaws.com (truststore.pki.rds.amazonaws.com)|13.226.2.99|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 4580 (4.5K) [application/octet-stream]
+Saving to: ‘ap-south-1-bundle.pem’
+
+ap-south-1-bundle.pem              100%[================================================================>]   4.47K  --.-KB/s    in 0s
+
+2026-01-20 06:51:32 (977 MB/s) - ‘ap-south-1-bundle.pem’ saved [4580/4580]
+
+ubuntu@ip-172-31-41-206:~$ export DB_HOST="database-1.cjmguigyom7s.ap-south-1.rds.amazonaws.com"
+ubuntu@ip-172-31-41-206:~$ export DB_PORT=5432
+ubuntu@ip-172-31-41-206:~$ export DB_USER="iam_user"
+ubuntu@ip-172-31-41-206:~$ export DB_NAME="postgres"
+ubuntu@ip-172-31-41-206:~$ TOKEN=$(aws rds generate-db-auth-token \
+  --hostname "$DB_HOST" \
+  --port 5432 \
+  --username "$DB_USER")
+ubuntu@ip-172-31-41-206:~$ TOKEN=$(aws rds generate-db-auth-token \
+  --region ap-south-1 \
+  --hostname "$DB_HOST" \
+  --port 5432 \
+  --username "$DB_USER")
+ubuntu@ip-172-31-41-206:~$ psql   "host=$DB_HOST \
+  port=5432 \
+  dbname=$DB_NAME \
+  user=$DB_USER \
+  sslmode=verify-full \
+  sslrootcert=ap-south-1-bundle.pem \
+  password=$TOKEN"
+psql (14.20 (Ubuntu 14.20-0ubuntu0.22.04.1), server 17.6)
+WARNING: psql major version 14, server major version 17.
+         Some psql features might not work.
+SSL connection (protocol: TLSv1.3, cipher: TLS_AES_256_GCM_SHA384, bits: 256, compression: off)
+Type "help" for help.
+
+postgres=> Connection to ec2-13-233-143-206.ap-south-1.compute.amazonaws.com closed by remote host.
+Connection to ec2-13-233-143-206.ap-south-1.compute.amazonaws.com closed.
+PS C:\Users\Devesh Sharma\downloads>
+
